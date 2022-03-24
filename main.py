@@ -9,7 +9,7 @@ import requests as rq
 import json
 import dotenv
 from urllib.request import urlopen
-from datetime import datetime
+from datetime import datetime, timezone
 from lxml import etree
 from datetime import datetime
 from lxml import etree
@@ -25,45 +25,50 @@ CONFIG = dotenv.dotenv_values()
 html = etree.Element("html")
 
 def scrape_site(x, y):
-        
+    
         for i in range(x, y):
-            if i < 1000:
-                i = str(i).zfill(4)        
-            try:
+                if i < 1000:
+                    i = str(i).zfill(4)
                 try:
-                    url ="https://www.colisprive.com/moncolis/pages/detailColis.aspx?numColis="+CONFIG['SPECIAL']+str(i)+CONFIG['ZIP']
-                     
-                    page = requests.get(url).text
+                        try:
+                            url ="https://www.colisprive.com/moncolis/pages/detailColis.aspx?numColis="+CONFIG['SPECIAL']+str(i)+CONFIG['ZIP']
+
+                            page = requests.get(url).text
+                        except:
+                            print("impossible to load the website")
+                        try:
+                                soup = BeautifulSoup(page, 'html.parser')
+                                dom = etree.HTML(str(soup))
+                                TRACKINGID = dom.xpath('//*[@id="ctl00_ContentDetailColis_pnResultatColis"]/div[1]/div/div[1]/div')[0]
+                                ID = TRACKINGID.text
+                                data = {
+                                    "username":
+                                    CONFIG['EMBEDUSERNAME'],
+                                    "embeds": [{
+                                        "title":
+                                        f"TRACKING FOUND : {str(ID)}",
+                                        "color":
+                                        int(CONFIG['COLOUR']),
+                                        "footer": {
+                                            "text": CONFIG['FOOTERTEXT']
+                                        },
+                                        "timestamp":
+                                        str(datetime.now(timezone.utc)),
+                                        "url":
+                                        url,
+                                    }],
+                                }
+                                result = rq.post(CONFIG['WEBHOOK'], data=json.dumps(data), headers={"Content-Type": "application/json"})
+                                with open('TRACKINGIDS.csv', 'a', newline='') as inp:
+                                                            writer_object = writer(inp)
+                                                            list_data = ["track :", str(ID)]
+                                                            writer_object.writerow(list_data)  
+                                                            inp.close()
+                        except:
+                            print(url)
+
                 except:
-                    print("impossible to load the website")
-                try:
-                    soup = BeautifulSoup(page, 'html.parser')
-                    dom = etree.HTML(str(soup))
-                    TRACKINGID = dom.xpath('//*[@id="ctl00_ContentDetailColis_pnResultatColis"]/div[1]/div/div[1]/div')[0]
-                    ID = TRACKINGID.text
-                    data = {
-                    "username": CONFIG['EMBEDUSERNAME'],
-                    "embeds": [{
-                        "title": "TRACKING FOUND : " + str(ID),
-                        "color": int(CONFIG['COLOUR']),
-                        "footer": {"text": CONFIG['FOOTERTEXT']},
-                        "timestamp": str(datetime.utcnow()),
-                        "url": url,
-                        
-                        }]
-                    }
-                    result = rq.post(CONFIG['WEBHOOK'], data=json.dumps(data), headers={"Content-Type": "application/json"})
-                    with open('TRACKINGIDS.csv', 'a', newline='') as inp:
-                                                writer_object = writer(inp)
-                                                list_data = ["track :", str(ID)]
-                                                writer_object.writerow(list_data)  
-                                                inp.close()
-                except:
-                    print(url)
-                                  
-            except:
-                print("Searching ...")
-                pass
+                        print("Searching ...")
            
 start_time = perf_counter()
 threads = []
